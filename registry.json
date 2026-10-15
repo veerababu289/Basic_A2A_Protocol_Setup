@@ -1,0 +1,24 @@
+{
+  "agents": [
+    {
+      "id": "order-agent",
+      "name": "Order Management Agent",
+      "description": "Looks up order status and estimated delivery",
+      "base_url": "http://127.0.0.1:8001",
+      "card_url": "http://127.0.0.1:8001/.well-known/agent-card.json",
+      "capabilities": [
+        "get_order_status"
+      ]
+    },
+    {
+      "id": "payment-agent",
+      "name": "Payment Agent",
+      "description": "Looks up payment status and amount for an order",
+      "base_url": "http://127.0.0.1:8002",
+      "card_url": "http://127.0.0.1:8002/.well-known/agent-card.json",
+      "capabilities": [
+        "get_payment_status"
+      ]
+    }
+  ]
+}
