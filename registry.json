@@ -4,20 +4,40 @@
       "id": "order-agent",
       "name": "Order Management Agent",
       "description": "Looks up order status and estimated delivery",
-      "base_url": "http://127.0.0.1:8001",
-      "card_url": "http://127.0.0.1:8001/.well-known/agent-card.json",
+      "base_url": "http://127.0.0.1:8001/status/",
+      "card_url": "http://127.0.0.1:8001/status/.well-known/agent-card.json",
       "capabilities": [
         "get_order_status"
+      ]
+    },
+    {
+      "id": "order-delivery-agent",
+      "name": "Order Delivery Agent",
+      "description": "Looks up estimated delivery date for an order",
+      "base_url": "http://127.0.0.1:8001/delivery/",
+      "card_url": "http://127.0.0.1:8001/delivery/.well-known/agent-card.json",
+      "capabilities": [
+        "get_estimated_delivery"
       ]
     },
     {
       "id": "payment-agent",
       "name": "Payment Agent",
       "description": "Looks up payment status and amount for an order",
-      "base_url": "http://127.0.0.1:8002",
-      "card_url": "http://127.0.0.1:8002/.well-known/agent-card.json",
+      "base_url": "http://127.0.0.1:8002/status/",
+      "card_url": "http://127.0.0.1:8002/status/.well-known/agent-card.json",
       "capabilities": [
         "get_payment_status"
+      ]
+    },
+    {
+      "id": "payment-amount-agent",
+      "name": "Payment Amount Agent",
+      "description": "Looks up the amount and currency for an order payment",
+      "base_url": "http://127.0.0.1:8002/amount/",
+      "card_url": "http://127.0.0.1:8002/amount/.well-known/agent-card.json",
+      "capabilities": [
+        "get_payment_amount"
       ]
     }
   ]

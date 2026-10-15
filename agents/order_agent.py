@@ -12,6 +12,8 @@ from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 from langgraph.graph import END, START, StateGraph
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 
 class OrderState(TypedDict):
@@ -61,22 +63,69 @@ class OrderAgentExecutor(AgentExecutor):
         await event_queue.enqueue_event(new_agent_text_message("Order lookup cancelled."))
 
 
-skill = AgentSkill(
-    id="get_order_status",
-    name="Get Order Status",
-    description="Returns the status and estimated delivery date for a demo order ID.",
-    tags=["orders", "shipping", "delivery"],
-    examples=["Check order ORD-1001"],
-)
-card = AgentCard(
+class DeliveryAgentExecutor(AgentExecutor):
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        order_id = parse_order_id(context.get_user_input())
+        order = ORDERS.get(order_id)
+        if order:
+            result = {"order_id": order_id, "found": True, "estimated_delivery": order["estimated_delivery"]}
+        else:
+            result = {
+                "order_id": order_id or None,
+                "found": False,
+                "message": "Delivery estimate not found",
+            }
+        await event_queue.enqueue_event(new_agent_text_message(json.dumps(result)))
+
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        await event_queue.enqueue_event(new_agent_text_message("Delivery estimate lookup cancelled."))
+
+
+def build_agent_app(card: AgentCard, executor: AgentExecutor):
+    handler = DefaultRequestHandler(agent_executor=executor, task_store=InMemoryTaskStore())
+    return A2AStarletteApplication(agent_card=card, http_handler=handler).build()
+
+
+order_status_card = AgentCard(
     name="Order Management Agent",
     description="An independent LangGraph-based agent for order status lookups.",
-    url="http://127.0.0.1:8001/",
+    url="http://127.0.0.1:8001/status/",
     version="1.0.0",
     defaultInputModes=["text/plain"],
     defaultOutputModes=["text/plain"],
     capabilities=AgentCapabilities(streaming=False),
-    skills=[skill],
+    skills=[
+        AgentSkill(
+            id="get_order_status",
+            name="Get Order Status",
+            description="Returns the status and estimated delivery date for a demo order ID.",
+            tags=["orders", "shipping", "delivery"],
+            examples=["Check order ORD-1001"],
+        )
+    ],
 )
-handler = DefaultRequestHandler(agent_executor=OrderAgentExecutor(), task_store=InMemoryTaskStore())
-app = A2AStarletteApplication(agent_card=card, http_handler=handler).build()
+delivery_card = AgentCard(
+    name="Order Delivery Agent",
+    description="Returns the estimated delivery date for a demo order ID.",
+    url="http://127.0.0.1:8001/delivery/",
+    version="1.0.0",
+    defaultInputModes=["text/plain"],
+    defaultOutputModes=["text/plain"],
+    capabilities=AgentCapabilities(streaming=False),
+    skills=[
+        AgentSkill(
+            id="get_estimated_delivery",
+            name="Get Estimated Delivery",
+            description="Returns the estimated delivery date for a demo order ID.",
+            tags=["orders", "shipping", "delivery"],
+            examples=["When will ORD-1001 be delivered?"],
+        )
+    ],
+)
+
+app = Starlette(
+    routes=[
+        Mount("/status", app=build_agent_app(order_status_card, OrderAgentExecutor())),
+        Mount("/delivery", app=build_agent_app(delivery_card, DeliveryAgentExecutor())),
+    ]
+)

@@ -8,10 +8,10 @@ Demonstrate how independently running agents discover each other and exchange ta
 
 ### In scope
 - Google ADK coordinator agent.
-- LangGraph-based Order Agent.
-- Plain-Python Payment Agent.
-- Separate local ports.
-- Agent Cards served at the well-known path.
+- Two order agents hosted by one LangGraph/Starlette server.
+- Two payment agents hosted by one plain-Python/Starlette server.
+- Separate local server ports, with each agent mounted under its own path.
+- A separate Agent Card served by each mounted agent.
 - Registry-backed discovery at request time.
 - A2A `message/send` requests and responses.
 - Direct smoke test, logs, technical documentation, and presentation.
@@ -30,8 +30,8 @@ Demonstrate how independently running agents discover each other and exchange ta
    - Acceptance: architecture and sequence diagrams are documented.
 
 2. **Specialist agents**
-   - Implement Order Agent and Payment Agent as independent processes.
-   - Acceptance: each exposes an Agent Card and handles an A2A request.
+   - Implement two separately mounted agents on each specialist server.
+   - Acceptance: each of the four agents exposes its own Agent Card and handles an A2A request.
 
 3. **Registry and coordinator**
    - Register IDs, capabilities, base URLs, and card URLs.
@@ -53,8 +53,8 @@ Demonstrate how independently running agents discover each other and exchange ta
 | Service | Port | Purpose |
 |---|---:|---|
 | ADK coordinator UI | 8000 | User interaction |
-| Order Agent | 8001 | A2A server |
-| Payment Agent | 8002 | A2A server |
+| Order server | 8001 | Order status at `/status/`; delivery estimate at `/delivery/` |
+| Payment server | 8002 | Payment status at `/status/`; amount lookup at `/amount/` |
 
 ## Key design decision
 

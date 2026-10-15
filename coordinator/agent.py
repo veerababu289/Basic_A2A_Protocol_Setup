@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +47,7 @@ def call_agent(agent_id: str, message: str) -> dict[str, Any]:
     """Send an A2A message/send JSON-RPC request to a registered agent.
 
     Args:
-        agent_id: Registry ID such as order-agent or payment-agent.
+        agent_id: Registry ID such as order-agent or payment-amount-agent.
         message: Natural-language task for the remote agent.
     """
     registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
@@ -63,16 +64,16 @@ def call_agent(agent_id: str, message: str) -> dict[str, Any]:
             card = card_response.json()
 
             # POC allowlist: require card URL to match the registry's expected base.
-            if not card.get("url", "").rstrip("/").startswith(match["base_url"].rstrip("/")):
+            if card.get("url", "").rstrip("/") != match["base_url"].rstrip("/"):
                 return {"ok": False, "error": "Agent Card URL does not match registry allowlist"}
 
             payload = {
                 "jsonrpc": "2.0",
-                "id": "poc-call-001",
+                "id": str(uuid.uuid4()),
                 "method": "message/send",
                 "params": {
                     "message": {
-                        "messageId": "poc-message-001",
+                        "messageId": str(uuid.uuid4()),
                         "role": "user",
                         "parts": [{"type": "text", "text": message}],
                     }
@@ -101,12 +102,14 @@ root_agent = Agent(
     description="Coordinates work across independent agents discovered through a registry.",
     instruction=(
         "You are an enterprise coordinator agent. For requests about order status, first use "
-        "discover_agents with capability get_order_status and call the order-agent. For payment "
-        "status, discover capability get_payment_status and call payment-agent. If a user asks for "
-        "both order and payment information, discover the relevant agents and call BOTH specialist "
-        "agents, then combine only the returned facts. Never invent results. Explain that discovery "
-        "uses a registry and each agent's Agent Card, while requests use A2A message/send. If a tool "
-        "returns an error, report it clearly."
+        "discover_agents with capability get_order_status and call order-agent. For delivery "
+        "estimates, discover get_estimated_delivery and call order-delivery-agent. For payment "
+        "status, discover get_payment_status and call payment-agent. For payment amount or currency, "
+        "discover get_payment_amount and call payment-amount-agent. If a user asks for multiple "
+        "kinds of information, discover and call each relevant specialist, then combine only the "
+        "returned facts. Never invent results. Explain that discovery uses a registry and each "
+        "agent's Agent Card, while requests use A2A message/send. If a tool returns an error, report "
+        "it clearly."
     ),
     tools=[discover_agents, call_agent],
 )

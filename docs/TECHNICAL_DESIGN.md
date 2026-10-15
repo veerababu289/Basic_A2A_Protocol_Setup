@@ -4,10 +4,10 @@
 
 This POC demonstrates three independent processes:
 - Google ADK coordinator.
-- LangGraph Order Agent.
-- Plain-Python Payment Agent.
+- Order server hosting two separately mounted A2A agents.
+- Payment server hosting two separately mounted A2A agents.
 
-The specialist agents expose A2A-compatible endpoints and Agent Cards. The coordinator reads a registry to discover endpoints, fetches a card, and submits a JSON-RPC `message/send` request.
+Each specialist server exposes two A2A-compatible endpoints, each with its own Agent Card and executor. The coordinator reads a registry to discover an agent's endpoint, fetches its card, and submits a JSON-RPC `message/send` request.
 
 ## 2. Core concepts
 
@@ -32,12 +32,16 @@ These are separate responsibilities. A card is not itself a registry, and publis
 The LLM chooses when to use the tools based on its instructions and the user's request. Direct protocol verification does not depend on the LLM; use `tests/smoke_test.py`.
 
 ### Order Agent
-`agents/order_agent.py` implements order lookup as a small LangGraph workflow and wraps it in the A2A Python SDK server components.
+`agents/order_agent.py` mounts two A2A applications into one Starlette server:
+- `/status/` runs order status lookup as a small LangGraph workflow.
+- `/delivery/` runs a separate estimated-delivery executor.
 
 ### Payment Agent
-`agents/payment_agent.py` implements deterministic lookup logic in plain Python and wraps it in the same A2A server interface.
+`agents/payment_agent.py` mounts two A2A applications into one Starlette server:
+- `/status/` returns payment status and amount.
+- `/amount/` returns payment amount and currency.
 
-The shared protocol means the coordinator does not need to know the internal framework of either specialist.
+Each mounted application has its own Agent Card, executor, and in-memory task store. The shared protocol means the coordinator does not need to know the internal framework of a specialist. The registry has four agent entries, even though there are only two specialist server processes.
 
 ## 4. Request flow
 
@@ -46,24 +50,28 @@ sequenceDiagram
     participant U as User
     participant C as Google ADK Coordinator
     participant R as registry.json
-    participant O as Order Agent (A2A)
-    participant P as Payment Agent (A2A)
+    participant OS as Order Status Agent (A2A)
+    participant OD as Order Delivery Agent (A2A)
+    participant PS as Payment Status Agent (A2A)
+    participant PA as Payment Amount Agent (A2A)
 
     U->>C: Check order ORD-1001 and payment status
     C->>R: Discover get_order_status
-    R-->>C: Order Agent URL + card URL
-    C->>O: GET /.well-known/agent-card.json
-    O-->>C: Agent Card
-    C->>O: A2A message/send
-    O-->>C: Order status result
+    R-->>C: Order status URL + card URL
+    C->>OS: GET /status/.well-known/agent-card.json
+    OS-->>C: Agent Card
+    C->>OS: A2A message/send at /status/
+    OS-->>C: Order status result
     C->>R: Discover get_payment_status
-    R-->>C: Payment Agent URL + card URL
-    C->>P: GET /.well-known/agent-card.json
-    P-->>C: Agent Card
-    C->>P: A2A message/send
-    P-->>C: Payment result
+    R-->>C: Payment status URL + card URL
+    C->>PS: GET /status/.well-known/agent-card.json
+    PS-->>C: Agent Card
+    C->>PS: A2A message/send at /status/
+    PS-->>C: Payment result
     C-->>U: Combined summary
 ```
+
+The additional agents are selected in the same way by their capabilities: `get_estimated_delivery` routes to the order server's `/delivery/` mount, and `get_payment_amount` routes to the payment server's `/amount/` mount.
 
 ## 5. Example request
 
@@ -90,7 +98,7 @@ The exact wire schema depends on the pinned A2A SDK/protocol version. Keep the S
 
 ## 6. Why different frameworks work
 
-The Order Agent uses LangGraph to run its business workflow; the Payment Agent uses ordinary Python functions. Both adapt their work to the same A2A interface. The coordinator communicates with the protocol boundary, not the internal framework.
+The order status agent uses LangGraph to run its business workflow; its delivery agent and both payment agents use ordinary Python functions. All four adapt their work to the same A2A interface. The coordinator communicates with each protocol endpoint, not the internal framework.
 
 A2A does not require all agents to share the same model, framework, language, or host. They do need compatible protocol implementations and reachable endpoints.
 
